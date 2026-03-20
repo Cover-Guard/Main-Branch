@@ -17,8 +17,18 @@ const PORT = parseInt(process.env.PORT ?? '4000', 10)
 // ─── Security / middleware ────────────────────────────────────────────────────
 
 app.use(helmet())
+const allowedOrigins = (
+  process.env.CORS_ALLOWED_ORIGINS ??
+  'http://localhost:3000,https://coverguard.io,https://www.coverguard.io'
+).split(',').map((o) => o.trim())
+
 app.use(cors({
-  origin: (process.env.CORS_ALLOWED_ORIGINS ?? 'http://localhost:3000').split(','),
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Vercel edge)
+    if (!origin) return callback(null, true)
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    callback(new Error(`CORS: origin '${origin}' not allowed`))
+  },
   credentials: true,
 }))
 app.use(compression())
