@@ -1,21 +1,19 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 
 const MAX_COMPARE = 3
 const STORAGE_KEY = 'cg_compare_ids'
 
 export function useCompare() {
-  const [ids, setIds] = useState<string[]>([])
-
-  useEffect(() => {
+  const [ids, setIds] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) setIds(JSON.parse(stored) as string[])
+      return stored ? (JSON.parse(stored) as string[]) : []
     } catch {
-      // ignore
+      return []
     }
-  }, [])
+  })
 
   const persist = useCallback((next: string[]) => {
     setIds(next)
