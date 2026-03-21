@@ -31,7 +31,6 @@ jobs:
   deploy-api:
     name: Deploy API → api.coverguard.io
     runs-on: ubuntu-latest
-    needs: migrate
     environment: production
     steps:
       - uses: actions/checkout@v4
