@@ -57,15 +57,16 @@ clientsRouter.patch('/:id', async (req: Request, res, next) => {
   try {
     const { userId } = req as AuthenticatedRequest
     const body = updateSchema.parse(req.body)
+    const id = String(req.params.id)
     const client = await prisma.client.updateMany({
-      where: { id: req.params.id, agentId: userId },
+      where: { id, agentId: userId },
       data: body,
     })
     if (client.count === 0) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Client not found' } })
       return
     }
-    const updated = await prisma.client.findUniqueOrThrow({ where: { id: req.params.id } })
+    const updated = await prisma.client.findUniqueOrThrow({ where: { id } })
     res.json({ success: true, data: updated })
   } catch (err) { next(err) }
 })
@@ -75,7 +76,7 @@ clientsRouter.patch('/:id', async (req: Request, res, next) => {
 clientsRouter.delete('/:id', async (req: Request, res, next) => {
   try {
     const { userId } = req as AuthenticatedRequest
-    await prisma.client.deleteMany({ where: { id: req.params.id, agentId: userId } })
+    await prisma.client.deleteMany({ where: { id: String(req.params.id), agentId: userId } })
     res.json({ success: true, data: null })
   } catch (err) { next(err) }
 })

@@ -60,18 +60,18 @@ export async function getOrComputeRiskProfile(propertyId: string): Promise<Prope
 
   // Fetch risk data in parallel
   const [floodData, fireData, earthquakeData, windData, crimeData] = await Promise.all([
-    fetchFloodRisk(property.lat, property.lng, property.zip),
+    fetchFloodRisk(property.lat, property.lng, property.zip ?? ''),
     fetchFireRisk(property.lat, property.lng, property.state),
     fetchEarthquakeRisk(property.lat, property.lng),
     fetchWindRisk(property.lat, property.lng, property.state),
-    fetchCrimeRisk(property.lat, property.lng, property.zip),
+    fetchCrimeRisk(property.lat, property.lng, property.zip ?? ''),
   ])
 
   // Compute scores
   const floodScore = computeFloodScore(floodData.floodZone, floodData.inSpecialFloodHazardArea ?? false)
   const fireScore = computeFireScore(fireData.firHazardSeverityZone ?? null, fireData.wildlandUrbanInterface ?? false)
   const windScore = computeWindScore(windData.hurricaneRisk ?? false, windData.tornadoRisk ?? false, windData.hailRisk ?? false)
-  const earthquakeScore = computeEarthquakeScore(earthquakeData.seismicZone)
+  const earthquakeScore = computeEarthquakeScore(earthquakeData.seismicZone ?? undefined)
   const crimeScore = computeCrimeScore(crimeData.violentCrimeIndex ?? 380, crimeData.propertyCrimeIndex ?? 2110)
 
   // Overall = weighted average
