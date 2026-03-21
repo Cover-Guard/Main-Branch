@@ -278,7 +278,6 @@ export async function fetchCrimeRisk(lat: number, lng: number, zip: string): Pro
 
     // National averages (FBI 2022): violent ~380, property ~1,954 per 100k
     const nationalViolentAvg  = 380
-    const nationalPropertyAvg = 1954
     const nationalAvgDiff = ((violentRate - nationalViolentAvg) / nationalViolentAvg) * 100
 
     return {
