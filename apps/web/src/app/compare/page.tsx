@@ -1,13 +1,15 @@
-'use client'
-
-import { Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { Metadata } from 'next'
 import { Navbar } from '@/components/layout/Navbar'
 import { CompareView } from '@/components/compare/CompareView'
 
-function ComparePageContent() {
-  const searchParams = useSearchParams()
-  const ids = searchParams.get('ids')
+export const metadata: Metadata = { title: 'Compare Properties' }
+
+interface ComparePageProps {
+  searchParams: Promise<{ ids?: string }>
+}
+
+export default async function ComparePage({ searchParams }: ComparePageProps) {
+  const { ids } = await searchParams
   const propertyIds = ids ? ids.split(',').filter(Boolean).slice(0, 3) : []
 
   return (
@@ -23,13 +25,5 @@ function ComparePageContent() {
         <CompareView propertyIds={propertyIds} />
       </div>
     </div>
-  )
-}
-
-export default function ComparePage() {
-  return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" /></div>}>
-      <ComparePageContent />
-    </Suspense>
   )
 }

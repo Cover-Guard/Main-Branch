@@ -73,7 +73,6 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_API_URL: https://api.coverguard.io
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
 
   # ── Preview deployment on PRs ─────────────────────────────────────────────
   preview:
@@ -87,34 +86,21 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+      - run: npm install -g vercel
       - run: npm ci
       - run: npm run build --workspace=@coverguard/shared
 
-      - name: Build web (static export)
-        working-directory: apps/web
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_API_URL: https://api.coverguard.io
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-
-      - name: Set up Base44 auth
-        run: |
-          mkdir -p ~/.base44/auth
-          echo '${{ secrets.BASE44_AUTH_JSON }}' > ~/.base44/auth/auth.json
-
-      - name: Inject Base44 app config
-        working-directory: apps/web
-        run: |
-          echo '{"id":"${{ secrets.BASE44_APP_ID }}"}' > base44/.app.jsonc
-
-      - name: Deploy preview to Base44
+      - name: Deploy web preview
         id: preview-web
         working-directory: apps/web
         run: |
-          npx base44 site deploy -y
-          echo "url=https://preview.coverguard.io" >> $GITHUB_OUTPUT
+          vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --token=${{ secrets.VERCEL_TOKEN }}
+          URL=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
       - name: Comment preview URL on PR
         uses: actions/github-script@v7
