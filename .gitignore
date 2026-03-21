@@ -42,5 +42,8 @@ coverage/
 prisma/dev.db
 prisma/dev.db-journal
 
+# Base44
+**/base44/.app.jsonc
+
 # Misc
 .eslintcache

@@ -1,30 +1,50 @@
-import { redirect } from 'next/navigation'
-import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Navbar } from '@/components/layout/Navbar'
 import { AgentDashboard } from '@/components/dashboard/AgentDashboard'
 import { ConsumerDashboard } from '@/components/dashboard/ConsumerDashboard'
 
-export const metadata: Metadata = { title: 'Dashboard' }
+export default function DashboardPage() {
+  const router = useRouter()
+  const [isAgent, setIsAgent] = useState<boolean | null>(null)
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  useEffect(() => {
+    const init = async () => {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.replace('/login')
+        return
+      }
 
-  // Fetch user profile from API
-  let userRole: 'BUYER' | 'AGENT' | 'LENDER' | 'ADMIN' = 'BUYER'
-  try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` },
-    })
-    const json = await res.json()
-    if (json.success) userRole = json.data.role
-  } catch {
-    // default to BUYER
+      try {
+        const session = (await supabase.auth.getSession()).data.session
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        const json = await res.json()
+        const role = json.success ? json.data.role : 'BUYER'
+        setIsAgent(role === 'AGENT' || role === 'LENDER' || role === 'ADMIN')
+      } catch {
+        setIsAgent(false)
+      }
+    }
+    init()
+  }, [router])
+
+  if (isAgent === null) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex h-[80vh] items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
+        </div>
+      </div>
+    )
   }
-
-  const isAgent = userRole === 'AGENT' || userRole === 'LENDER' || userRole === 'ADMIN'
 
   return (
     <div className="min-h-screen bg-gray-50">

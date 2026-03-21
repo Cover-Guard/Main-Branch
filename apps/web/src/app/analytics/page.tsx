@@ -1,15 +1,19 @@
-import { Metadata } from 'next'
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+'use client'
+
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { Navbar } from '@/components/layout/Navbar'
 import { AnalyticsDashboard } from '@/components/analytics/AnalyticsDashboard'
 
-export const metadata: Metadata = { title: 'Analytics' }
+export default function AnalyticsPage() {
+  const router = useRouter()
 
-export default async function AnalyticsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data: { user } }) => {
+      if (!user) router.replace('/login')
+    })
+  }, [router])
 
   return (
     <div className="min-h-screen bg-gray-50">
