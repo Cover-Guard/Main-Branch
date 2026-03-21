@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
-import { Navbar } from '@/components/layout/Navbar'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { AgentDashboard } from '@/components/dashboard/AgentDashboard'
 import { ConsumerDashboard } from '@/components/dashboard/ConsumerDashboard'
 
@@ -12,7 +12,6 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch user profile from API
   let userRole: 'BUYER' | 'AGENT' | 'LENDER' | 'ADMIN' = 'BUYER'
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me`, {
@@ -27,9 +26,8 @@ export default async function DashboardPage() {
   const isAgent = userRole === 'AGENT' || userRole === 'LENDER' || userRole === 'ADMIN'
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <SidebarLayout>
       {isAgent ? <AgentDashboard /> : <ConsumerDashboard />}
-    </div>
+    </SidebarLayout>
   )
 }
