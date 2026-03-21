@@ -27,24 +27,32 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  # ── Deploy API to Render ──────────────────────────────────────────────────────
+  # ── Deploy API to Vercel ─────────────────────────────────────────────────────
   deploy-api:
     name: Deploy API → api.coverguard.io
     runs-on: ubuntu-latest
     needs: migrate
     environment: production
     steps:
-      - name: Trigger Render deploy
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install -g vercel
+      - name: Deploy API
+        working-directory: apps/api
         run: |
-          curl -s -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
-            -H "Content-Type: application/json" \
-            --fail-with-body
-        # Set RENDER_DEPLOY_HOOK_URL in GitHub secrets (from Render dashboard).
-        # Render runs the Express API as a Web Service using apps/api/Dockerfile.
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_API_PROJECT_ID }}
 
-  # ── Deploy Web to Base44 ──────────────────────────────────────────────────────
+  # ── Deploy Web to Vercel ─────────────────────────────────────────────────────
   deploy-web:
-    name: Deploy Web → coverguard.io (Base44)
+    name: Deploy Web → coverguard.io
     runs-on: ubuntu-latest
     needs: deploy-api
     environment: production
@@ -54,36 +62,18 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-
-      - name: Install dependencies & build shared package
+      - run: npm install -g vercel
+      - name: Build shared package first
         run: npm ci && npm run build --workspace=@coverguard/shared
-
-      - name: Build web (static export)
+      - name: Deploy Web
         working-directory: apps/web
-        run: npm run build
+        run: |
+          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_API_URL: https://api.coverguard.io
-          NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
-
-      - name: Set up Base44 auth
-        run: |
-          mkdir -p ~/.base44/auth
-          echo '${{ secrets.BASE44_AUTH_JSON }}' > ~/.base44/auth/auth.json
-        # BASE44_AUTH_JSON: copy the contents of ~/.base44/auth/auth.json after
-        # running `npx base44 login` locally, then store as a GitHub secret.
-
-      - name: Inject Base44 app config
-        working-directory: apps/web
-        run: |
-          echo '{"id":"${{ secrets.BASE44_APP_ID }}"}' > base44/.app.jsonc
-        # BASE44_APP_ID: run `npx base44 link` locally, then copy the id from
-        # apps/web/base44/.app.jsonc and store as a GitHub secret.
-
-      - name: Deploy to Base44
-        working-directory: apps/web
-        run: npx base44 site deploy -y
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
 
   # ── Deployment summary ───────────────────────────────────────────────────────
   summary:
