@@ -2,9 +2,7 @@ import { prisma } from '../utils/prisma'
 import { fetchFloodRisk, fetchFireRisk, fetchEarthquakeRisk, fetchWindRisk, fetchCrimeRisk } from '../integrations/riskData'
 import type { PropertyRiskProfile, RiskLevel } from '@coverguard/shared'
 import { RISK_CACHE_TTL_SECONDS, RISK_SCORE_THRESHOLDS } from '@coverguard/shared'
-import { RiskLevel as PrismaRiskLevel } from '@prisma/client'
-
-function scoreToLevel(score: number): PrismaRiskLevel {
+function scoreToLevel(score: number): string {
   if (score <= RISK_SCORE_THRESHOLDS.LOW) return 'LOW'
   if (score <= RISK_SCORE_THRESHOLDS.MODERATE) return 'MODERATE'
   if (score <= RISK_SCORE_THRESHOLDS.HIGH) return 'HIGH'
