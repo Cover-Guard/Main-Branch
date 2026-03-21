@@ -7,7 +7,7 @@ import { InsuranceCostEstimate } from '@/components/property/InsuranceCostEstima
 import { PropertyDetails } from '@/components/property/PropertyDetails'
 import { InsurabilityPanel } from '@/components/property/InsurabilityPanel'
 import { ActiveCarriers } from '@/components/property/ActiveCarriers'
-import { Navbar } from '@/components/layout/Navbar'
+import { SidebarLayout } from '@/components/layout/SidebarLayout'
 import { PropertyMapInline } from '@/components/map/PropertyMapInline'
 import { formatAddress, formatCurrency } from '@coverguard/shared'
 
@@ -47,8 +47,8 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
   const fullAddress = `${prop.address}, ${prop.city}, ${prop.state} ${prop.zip}`
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navbar />
+    <SidebarLayout>
+      <div className="min-h-screen bg-[#f2f4f7]">
 
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
@@ -113,6 +113,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </SidebarLayout>
   )
 }

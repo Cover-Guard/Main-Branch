@@ -106,10 +106,11 @@ propertiesRouter.post('/:id/save', requireAuth, async (req: Request, res, next) 
     const { userId } = req as AuthenticatedRequest
     const body = saveSchema.parse(req.body)
 
+    const propertyId = String(req.params.id)
     const saved = await prisma.savedProperty.upsert({
-      where: { userId_propertyId: { userId, propertyId: req.params.id } },
+      where: { userId_propertyId: { userId, propertyId } },
       update: { notes: body.notes, tags: body.tags },
-      create: { userId, propertyId: req.params.id, notes: body.notes, tags: body.tags },
+      create: { userId, propertyId, notes: body.notes, tags: body.tags },
     })
     res.json({ success: true, data: saved })
   } catch (err) {
@@ -120,7 +121,7 @@ propertiesRouter.post('/:id/save', requireAuth, async (req: Request, res, next) 
 propertiesRouter.delete('/:id/save', requireAuth, async (req: Request, res, next) => {
   try {
     const { userId } = req as AuthenticatedRequest
-    await prisma.savedProperty.deleteMany({ where: { userId, propertyId: req.params.id } })
+    await prisma.savedProperty.deleteMany({ where: { userId, propertyId: String(req.params.id) } })
     res.json({ success: true, data: null })
   } catch (err) {
     next(err)
@@ -161,7 +162,7 @@ propertiesRouter.post('/:id/quote-request', requireAuth, async (req: Request, re
     const quoteRequest = await prisma.quoteRequest.create({
       data: {
         userId,
-        propertyId:    req.params.id,
+        propertyId:    String(req.params.id),
         carrierId:     body.carrierId,
         coverageTypes: body.coverageTypes,
         notes:         body.notes ?? null,
@@ -179,7 +180,7 @@ propertiesRouter.get('/:id/quote-requests', requireAuth, async (req: Request, re
   try {
     const { userId } = req as AuthenticatedRequest
     const requests = await prisma.quoteRequest.findMany({
-      where: { propertyId: req.params.id, userId },
+      where: { propertyId: String(req.params.id), userId },
       orderBy: { submittedAt: 'desc' },
     })
     res.json({ success: true, data: requests })

@@ -2,16 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import type { User } from '@coverguard/shared'
-import { getMe, updateMe } from '@/lib/api'
+import { getMe } from '@/lib/api'
 import { createClient } from '@/lib/supabase/client'
-import { User as UserIcon, Building2, Lock, Bell, Shield, CheckCircle } from 'lucide-react'
-
-type Section = 'profile' | 'security' | 'notifications'
+import { Settings, Shield, FileText, Trash2 } from 'lucide-react'
 
 export function AccountSettings() {
-  const [section, setSection] = useState<Section>('profile')
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
 
   useEffect(() => {
     getMe()
@@ -20,292 +18,128 @@ export function AccountSettings() {
       .finally(() => setLoading(false))
   }, [])
 
-  const navItems: Array<{ id: Section; label: string; icon: React.ElementType }> = [
-    { id: 'profile',       label: 'Profile',        icon: UserIcon    },
-    { id: 'security',      label: 'Security',        icon: Lock        },
-    { id: 'notifications', label: 'Notifications',   icon: Bell        },
-  ]
-
-  return (
-    <div className="flex gap-8">
-      {/* Sidebar nav */}
-      <nav className="hidden w-44 shrink-0 flex-col gap-1 sm:flex">
-        {navItems.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setSection(id)}
-            className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-              section === id
-                ? 'bg-brand-50 text-brand-700'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Icon className="h-4 w-4" />
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      {/* Content */}
-      <div className="flex-1">
-        {loading ? (
-          <div className="card h-64 animate-pulse bg-gray-100" />
-        ) : (
-          <>
-            {section === 'profile'       && <ProfileSection user={user} onSave={setUser} />}
-            {section === 'security'      && <SecuritySection />}
-            {section === 'notifications' && <NotificationsSection />}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ProfileSection({ user, onSave }: { user: User | null; onSave: (u: User) => void }) {
-  const [form, setForm] = useState({
-    firstName: user?.firstName ?? '',
-    lastName:  user?.lastName  ?? '',
-    company:   user?.company   ?? '',
-    licenseNumber: user?.licenseNumber ?? '',
-  })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      const updated = await updateMe(form)
-      onSave(updated)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2500)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save')
-    } finally {
-      setSaving(false)
-    }
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    window.location.href = '/login'
   }
 
-  return (
-    <div className="card p-6">
-      <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-gray-900">
-        <UserIcon className="h-5 w-5 text-brand-600" />
-        Profile Information
-      </h2>
-
-      {error && <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-700">{error}</div>}
-
-      <form onSubmit={handleSave} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">First name</label>
-            <input
-              className="input mt-1"
-              value={form.firstName}
-              onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label">Last name</label>
-            <input
-              className="input mt-1"
-              value={form.lastName}
-              onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="label">Email</label>
-          <input type="email" disabled className="input mt-1 opacity-60" value={user?.email ?? ''} />
-          <p className="mt-1 text-xs text-gray-400">Email cannot be changed here. Contact support.</p>
-        </div>
-
-        <div>
-          <label className="label">Role</label>
-          <input disabled className="input mt-1 capitalize opacity-60" value={user?.role?.toLowerCase() ?? ''} />
-        </div>
-
-        {(user?.role === 'AGENT' || user?.role === 'LENDER') && (
-          <>
-            <div>
-              <label className="label">Company / Brokerage</label>
-              <input
-                className="input mt-1"
-                value={form.company}
-                onChange={(e) => setForm({ ...form, company: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="label">License Number</label>
-              <input
-                className="input mt-1"
-                value={form.licenseNumber}
-                onChange={(e) => setForm({ ...form, licenseNumber: e.target.value })}
-              />
-            </div>
-          </>
-        )}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="btn-primary flex items-center gap-2 px-6 py-2.5"
-        >
-          {saved ? (
-            <>
-              <CheckCircle className="h-4 w-4" />
-              Saved
-            </>
-          ) : saving ? 'Saving…' : 'Save Changes'}
-        </button>
-      </form>
-    </div>
-  )
-}
-
-function SecuritySection() {
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault()
-    if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: 'Passwords do not match' })
-      return
-    }
-    if (newPassword.length < 8) {
-      setMessage({ type: 'error', text: 'Password must be at least 8 characters' })
-      return
-    }
-    setLoading(true)
-    setMessage(null)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.updateUser({ password: newPassword })
-      if (error) throw error
-      setMessage({ type: 'success', text: 'Password updated successfully' })
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    } catch (err) {
-      setMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to update password' })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const displayName =
+    user?.firstName && user?.lastName
+      ? `${user.firstName} ${user.lastName}`
+      : user?.email?.split('@')[0] ?? 'User'
 
   return (
-    <div className="card p-6">
-      <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-gray-900">
-        <Lock className="h-5 w-5 text-brand-600" />
-        Security
-      </h2>
-
-      <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
-        <div>
-          <label className="label">New Password</label>
-          <input
-            type="password"
-            className="input mt-1"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-        </div>
-        <div>
-          <label className="label">Confirm New Password</label>
-          <input
-            type="password"
-            className="input mt-1"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-        </div>
-
-        {message && (
-          <div className={`rounded p-3 text-sm ${
-            message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-          }`}>
-            {message.text}
-          </div>
-        )}
-
-        <button type="submit" disabled={loading} className="btn-primary px-6 py-2.5">
-          {loading ? 'Updating…' : 'Update Password'}
-        </button>
-      </form>
-
-      <div className="mt-8 border-t border-gray-100 pt-6">
-        <h3 className="mb-3 flex items-center gap-2 font-semibold text-gray-800">
-          <Shield className="h-4 w-4 text-green-600" />
-          Active Sessions
-        </h3>
-        <p className="text-sm text-gray-500">
-          You can sign out of all sessions if you believe your account has been compromised.
-        </p>
-        <button
-          className="btn-secondary mt-3 px-4 py-2 text-sm text-red-600 hover:border-red-300"
-          onClick={async () => {
-            const supabase = createClient()
-            await supabase.auth.signOut({ scope: 'global' })
-            window.location.href = '/login'
-          }}
-        >
-          Sign out all sessions
-        </button>
+    <div className="p-8 max-w-2xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-8">
+        <Settings className="h-6 w-6 text-gray-700" />
+        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
       </div>
-    </div>
-  )
-}
-
-function NotificationsSection() {
-  const [prefs, setPrefs] = useState({
-    quoteUpdates:   true,
-    riskAlerts:     true,
-    weeklyDigest:   false,
-    newCarriers:    true,
-    marketChanges:  false,
-  })
-
-  return (
-    <div className="card p-6">
-      <h2 className="mb-5 flex items-center gap-2 text-lg font-semibold text-gray-900">
-        <Bell className="h-5 w-5 text-brand-600" />
-        Notification Preferences
-      </h2>
 
       <div className="space-y-4">
-        {[
-          { key: 'quoteUpdates',  label: 'Quote Request Updates',   desc: 'When a carrier responds to your quote request' },
-          { key: 'riskAlerts',    label: 'Risk Alerts',             desc: 'When risk data for a saved property changes significantly' },
-          { key: 'newCarriers',   label: 'New Carrier Availability', desc: 'When a new carrier starts writing in areas you\'ve searched' },
-          { key: 'weeklyDigest',  label: 'Weekly Digest',           desc: 'Weekly summary of your property searches and market conditions' },
-          { key: 'marketChanges', label: 'Market Condition Changes', desc: 'When the insurance market tightens or improves in your areas' },
-        ].map(({ key, label, desc }) => (
-          <label key={key} className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={prefs[key as keyof typeof prefs]}
-              onChange={(e) => setPrefs({ ...prefs, [key]: e.target.checked })}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
-            />
-            <div>
-              <p className="text-sm font-medium text-gray-800">{label}</p>
-              <p className="text-xs text-gray-500">{desc}</p>
+        {/* Account card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-800 mb-4">Account</h2>
+          {loading ? (
+            <div className="space-y-3">
+              <div className="h-8 rounded bg-gray-100 animate-pulse" />
+              <div className="h-8 rounded bg-gray-100 animate-pulse" />
             </div>
-          </label>
-        ))}
-      </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs text-gray-400 font-medium mb-0.5">Email</p>
+                <p className="text-sm text-gray-800">{user?.email ?? '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 font-medium mb-0.5">Name</p>
+                <p className="text-sm text-gray-800">{displayName}</p>
+              </div>
+              {user?.role && (
+                <div>
+                  <p className="text-xs text-gray-400 font-medium mb-0.5">Role</p>
+                  <p className="text-sm text-gray-800 capitalize">
+                    {user.role.toLowerCase()}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
-      <button className="btn-primary mt-6 px-6 py-2.5">Save Preferences</button>
+        {/* Legal & Privacy card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-800 mb-4">
+            Legal &amp; Privacy
+          </h2>
+          <div className="space-y-3">
+            <LegalLink
+              icon={<Shield className="h-4 w-4 text-emerald-500" />}
+              label="Privacy Policy"
+            />
+            <LegalLink
+              icon={<FileText className="h-4 w-4 text-blue-500" />}
+              label="Terms of Service"
+            />
+            <LegalLink
+              icon={<Trash2 className="h-4 w-4 text-gray-400" />}
+              label="Request Data Deletion"
+            />
+          </div>
+        </div>
+
+        {/* Sign out */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-sm font-semibold text-gray-800 mb-4">Session</h2>
+          <button
+            onClick={handleSignOut}
+            className="text-sm font-medium text-gray-600 border border-gray-200 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Sign out
+          </button>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-red-50 rounded-xl border border-red-100 p-6">
+          <h2 className="text-sm font-semibold text-red-600 mb-4">Danger Zone</h2>
+          {deleteConfirm ? (
+            <div className="space-y-3">
+              <p className="text-sm text-red-700">
+                Are you sure? This action cannot be undone.
+              </p>
+              <div className="flex gap-2">
+                <button className="bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                  Yes, delete my account
+                </button>
+                <button
+                  onClick={() => setDeleteConfirm(false)}
+                  className="text-sm font-medium text-gray-600 border border-gray-200 px-4 py-2 rounded-lg hover:bg-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setDeleteConfirm(true)}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Account
+            </button>
+          )}
+        </div>
+      </div>
     </div>
+  )
+}
+
+function LegalLink({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <button className="flex items-center gap-2.5 text-sm text-blue-600 hover:underline w-full text-left">
+      {icon}
+      {label}
+    </button>
   )
 }
