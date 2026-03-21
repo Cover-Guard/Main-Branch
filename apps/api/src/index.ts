@@ -71,10 +71,13 @@ app.use((_req, res) => {
 
 app.use(errorHandler)
 
-// ─── Start ────────────────────────────────────────────────────────────────────
+// ─── Start (skip in serverless environments like Vercel) ─────────────────────
 
-app.listen(PORT, () => {
-  logger.info(`CoverGuard API running on port ${PORT} [${process.env.NODE_ENV ?? 'development'}]`)
-})
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    logger.info(`CoverGuard API running on port ${PORT} [${process.env.NODE_ENV ?? 'development'}]`)
+  })
+}
 
 export { app }
+export default app

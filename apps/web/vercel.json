@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "name": "coverguard-web",
   "framework": "nextjs",
-  "buildCommand": "cd ../.. && npm run build --filter=@coverguard/web",
+  "buildCommand": "cd ../.. && npm run build -- --filter=@coverguard/web",
   "outputDirectory": ".next",
   "installCommand": "cd ../.. && npm install",
   "regions": ["iad1"],
