@@ -6,7 +6,7 @@ This file provides context and conventions for AI assistants (e.g., Claude Code)
 
 ## Project Overview
 
-**CoverGuard** is a property insurability intelligence platform. It lets home buyers, real estate agents, and lenders instantly understand the flood, fire, earthquake, wind, and crime risks for any US property — and get a detailed insurance cost estimate — before placing a bid.
+**CoverGuard** is a property insurability intelligence platform. It lets home buyers, real estate agents, and lenders instantly understand the flood, fire, earthquake, wind, and crime risks for any US property — see which insurance carriers are **actively writing and binding policies** — and **request a binding quote** directly from the platform.
 
 | Detail | Value |
 |---|---|
@@ -14,6 +14,16 @@ This file provides context and conventions for AI assistants (e.g., Claude Code)
 | Package manager | npm workspaces (monorepo) |
 | Languages | TypeScript everywhere |
 | Node version | >= 20 |
+
+---
+
+## Core Product Objective
+
+> Empower agents and consumers to know the insurability and carrier availability for any US property **before placing a bid**, then allow them to request a binding quote from an active carrier.
+
+**Two user portals:**
+- **Agent / Team Portal** (`/agents/login`, `/agents/register`) — full dashboard with client management, property comparison, analytics, binding quote requests
+- **Consumer / Buyer Portal** (`/login`, `/register`) — simplified search, saved properties, quote requests
 
 ---
 
@@ -25,32 +35,54 @@ Main-Branch/
 │   ├── web/                    # Next.js 15 frontend (http://localhost:3000)
 │   │   └── src/
 │   │       ├── app/            # Next.js App Router pages
-│   │       │   ├── page.tsx            # Landing / hero
-│   │       │   ├── search/page.tsx     # Property search
-│   │       │   ├── properties/[id]/    # Property detail + risk + insurance
-│   │       │   ├── dashboard/page.tsx  # Authenticated user dashboard
-│   │       │   └── (auth)/login|register/
+│   │       │   ├── page.tsx                    # Landing with dual portal CTAs
+│   │       │   ├── (auth)/login|register/      # Consumer auth (email + Google OAuth)
+│   │       │   ├── agents/login|register/      # Agent portal auth (email + Google OAuth)
+│   │       │   ├── onboarding/page.tsx          # Terms/disclosures acceptance (post-signup)
+│   │       │   ├── search/page.tsx              # Split-view: results list + map with risk layers
+│   │       │   ├── properties/[id]/             # Property detail: risk + insurability + carriers + quotes
+│   │       │   ├── compare/page.tsx             # Side-by-side property comparison (up to 3)
+│   │       │   ├── dashboard/page.tsx           # Agent dashboard OR consumer dashboard (role-based)
+│   │       │   ├── analytics/page.tsx           # Analytics: searches, risk distribution, activity
+│   │       │   ├── account/page.tsx             # Account & settings
+│   │       │   └── api/auth/callback/           # Supabase OAuth callback + onboarding redirect
 │   │       ├── components/
-│   │       │   ├── search/     # SearchBar, SearchResults, PropertyCard
-│   │       │   └── property/   # RiskSummary, RiskBreakdown, InsuranceCostEstimate
+│   │       │   ├── layout/     # Navbar (sticky, with Search / Dashboard / Analytics / Account)
+│   │       │   ├── search/     # SearchBar, SearchResults, PropertyCard (with compare toggle)
+│   │       │   ├── property/   # RiskSummary, RiskBreakdown, InsuranceCostEstimate,
+│   │       │   │               # InsurabilityPanel, ActiveCarriers, QuoteRequestModal
+│   │       │   ├── map/        # PropertyMap (Mapbox + risk layer toggles), PropertyMapInline,
+│   │       │   │               # SearchMapClient
+│   │       │   ├── dashboard/  # AgentDashboard, ConsumerDashboard, ClientsPanel,
+│   │       │   │               # SavedPropertiesPanel
+│   │       │   ├── compare/    # CompareView
+│   │       │   ├── analytics/  # AnalyticsDashboard
+│   │       │   └── account/    # AccountSettings
 │   │       └── lib/
-│   │           ├── api.ts              # Typed API client (calls apps/api)
+│   │           ├── api.ts              # Typed API client
 │   │           ├── utils.ts            # cn(), risk color helpers
+│   │           ├── useCompare.ts       # localStorage-backed compare state (max 3)
 │   │           └── supabase/           # Supabase client / server / middleware
 │   │
 │   └── api/                    # Express REST API (http://localhost:4000)
 │       ├── src/
 │       │   ├── index.ts                # Server entry point
 │       │   ├── routes/
-│       │   │   ├── properties.ts       # /api/properties/* endpoints
-│       │   │   └── auth.ts             # /api/auth/* endpoints
+│       │   │   ├── properties.ts       # /api/properties/* including /insurability /carriers /quote-request
+│       │   │   ├── auth.ts             # /api/auth/* + /me/terms
+│       │   │   ├── clients.ts          # /api/clients/* (agent client management)
+│       │   │   └── analytics.ts        # /api/analytics
 │       │   ├── services/
 │       │   │   ├── propertyService.ts  # DB + external search
 │       │   │   ├── riskService.ts      # Risk scoring + caching
-│       │   │   └── insuranceService.ts # Premium estimation + caching
+│       │   │   ├── insuranceService.ts # Premium estimation + caching
+│       │   │   ├── carriersService.ts  # Active carriers by property/state/risk profile
+│       │   │   └── insurabilityService.ts # Insurability assessment from risk profile
 │       │   ├── integrations/
 │       │   │   ├── propertyData.ts     # ATTOM API (with mock fallback)
-│       │   │   └── riskData.ts         # FEMA, USGS, Cal Fire, FBI UCR
+│       │   │   └── riskData.ts         # FEMA NFHL, OpenFEMA claims, Cal Fire FHSZ,
+│       │   │                           # USFS WUI, USGS Design Maps, NOAA SLOSH,
+│       │   │                           # FBI CDE, ASCE 7 wind speed
 │       │   ├── middleware/
 │       │   │   ├── auth.ts             # Supabase JWT verification
 │       │   │   └── errorHandler.ts     # Central error handler
@@ -59,25 +91,28 @@ Main-Branch/
 │       │       ├── supabaseAdmin.ts    # Service-role Supabase client
 │       │       └── logger.ts           # Winston logger
 │       └── prisma/
-│           ├── schema.prisma           # Database schema (Supabase/PostgreSQL)
+│           ├── schema.prisma           # DB schema (see models below)
 │           └── seed.ts                 # Sample data seed
 │
 ├── packages/
-│   └── shared/                 # Internal package — shared across apps/api and apps/web
+│   └── shared/                 # Internal package shared across apps/api and apps/web
 │       └── src/
-│           ├── types/          # Property, RiskProfile, InsuranceCostEstimate, User, API
+│           ├── types/
+│           │   ├── property.ts     # Property, PropertyType, search params
+│           │   ├── risk.ts         # PropertyRiskProfile, FloodRisk, FireRisk, etc.
+│           │   ├── insurance.ts    # InsuranceCostEstimate, InsurabilityStatus,
+│           │   │                   # Carrier, CarriersResult, CarrierWritingStatus, MarketCondition
+│           │   ├── user.ts         # User, Client, ClientStatus, SavedProperty,
+│           │   │                   # PropertyReport, AnalyticsSummary
+│           │   └── api.ts          # ApiResponse
 │           ├── utils/          # formatters.ts, validators.ts
 │           └── constants/      # Risk thresholds, US states, cache TTLs
 │
 ├── .github/workflows/
-│   ├── ci.yml          # Runs on every push: typecheck, lint, test, build, Docker build
-│   ├── deploy.yml      # Runs on push to main: migrations + push Docker images
-│   └── db-migrate.yml  # Manual workflow: run Prisma migrations against staging/prod
-│
-├── docker-compose.yml  # Local dev (web + api; uses external Supabase)
-├── turbo.json          # Turborepo task graph
-├── .env.example        # All required environment variables (copy to .env)
-└── CLAUDE.md           # This file
+├── docker-compose.yml
+├── turbo.json
+├── .env.example
+└── CLAUDE.md
 ```
 
 ---
@@ -90,143 +125,135 @@ Main-Branch/
 | Frontend | Next.js 15, TypeScript, Tailwind CSS | App Router, Server Components |
 | Backend | Express 4, TypeScript, Node 20 | REST API |
 | Database | Supabase (PostgreSQL) | Hosted; no local Postgres needed |
-| Auth | Supabase Auth | JWT tokens; middleware handles session refresh |
+| Auth | Supabase Auth | Email/password + Google OAuth |
 | ORM | Prisma 6 | Schema migrations + type-safe queries |
-| Validation | Zod | Both API (Express) and frontend (react-hook-form) |
-| HTTP client | `fetch` (native) | Used in both API integrations and web lib/api.ts |
+| Maps | Mapbox GL / react-map-gl | Requires `NEXT_PUBLIC_MAPBOX_TOKEN` |
+| Validation | Zod | API routes + frontend forms |
+| HTTP client | `fetch` (native) | API integrations + web lib/api.ts |
 | Logging | Winston | JSON in production, colorized in dev |
-| Maps | Mapbox GL / react-map-gl | Set NEXT_PUBLIC_MAPBOX_TOKEN |
+
+---
+
+## Key DB Models
+
+| Model | Purpose |
+|---|---|
+| `User` | Auth profile, role, `termsAcceptedAt` |
+| `Property` | Property data (ATTOM or manual) |
+| `RiskProfile` | Cached risk scores (flood/fire/wind/eq/crime) |
+| `InsuranceEstimate` | Cached premium estimates |
+| `SavedProperty` | User's saved properties with notes/tags |
+| `Client` | Agent → client relationship |
+| `QuoteRequest` | Binding quote request to a carrier |
+| `PropertyReport` | Generated PDF reports |
+| `SearchHistory` | Search audit trail |
+
+---
+
+## Authentication & Onboarding Flow
+
+1. New user registers via `/register` (consumer) or `/agents/register` (agent) — email/password or Google OAuth
+2. After registration → redirected to `/onboarding` — **must accept terms and disclosures** before using the platform
+3. `termsAcceptedAt` stored in Supabase `user_metadata` AND in the `User.termsAcceptedAt` DB column (via `POST /api/auth/me/terms`)
+4. For OAuth sign-ins: `api/auth/callback` route checks `user.user_metadata.termsAcceptedAt`; if absent → redirects to `/onboarding`
+5. Returning users sign in via `/login` or `/agents/login` → skip onboarding
+6. Middleware (in `lib/supabase/middleware.ts`) protects `/dashboard`, `/analytics`, `/account`, `/compare`
+
+---
+
+## API Endpoints
+
+```
+GET  /api/properties/search                 Search (address/zip/parcelId)
+GET  /api/properties/:id                    Property detail
+GET  /api/properties/:id/risk               Risk profile (FEMA/USGS/etc.)
+GET  /api/properties/:id/insurance          Insurance cost estimate
+GET  /api/properties/:id/insurability       Insurability assessment
+GET  /api/properties/:id/carriers           Active carriers (by state + risk)
+POST /api/properties/:id/save               Save property [auth]
+DEL  /api/properties/:id/save               Unsave property [auth]
+POST /api/properties/:id/quote-request      Request binding quote [auth]
+GET  /api/properties/:id/quote-requests     List quote requests [auth]
+GET  /api/properties/:id/report             Full report bundle
+
+POST /api/auth/register                     Register
+GET  /api/auth/me                           Current user [auth]
+PATCH /api/auth/me                          Update profile [auth]
+POST /api/auth/me/terms                     Accept terms [auth]
+GET  /api/auth/me/saved                     Saved properties [auth]
+GET  /api/auth/me/reports                   Reports [auth]
+
+GET  /api/clients                           List clients [auth]
+POST /api/clients                           Add client [auth]
+PATCH /api/clients/:id                      Update client [auth]
+DEL  /api/clients/:id                       Delete client [auth]
+
+GET  /api/analytics                         Analytics summary [auth]
+```
+
+---
+
+## Public Data Source Integrations
+
+| Source | Data | Notes |
+|---|---|---|
+| FEMA NFHL | Flood zones, SFHA, BFE | `hazards.fema.gov/gis/nfhl` |
+| OpenFEMA Claims | Historical flood claims by ZIP | `fema.gov/api/open/v2/nfipClaims` |
+| Cal Fire FHSZ | CA fire hazard severity zones | `services1.arcgis.com` — CA only |
+| USFS WUI | Wildland-Urban Interface (all states) | `apps.fs.usda.gov/arcx` |
+| USGS Design Maps | Seismic (ASCE 7-22 spectral acceleration) | `earthquake.usgs.gov/ws/designmaps` |
+| NOAA SLOSH | Hurricane surge zones | `coast.noaa.gov/arcgis` — coastal only |
+| FBI CDE | Crime rates by agency/jurisdiction | `api.usa.gov/crime/fbi/cde` — needs `FBI_CDE_KEY` |
+| ASCE 7 | Design wind speed | Computed from lat/state |
+
+---
+
+## Environment Variables
+
+All in `.env.example`. Key additions:
+
+| Variable | Where used | Notes |
+|---|---|---|
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Web | Map in search and property pages |
+| `FBI_CDE_KEY` | API | FBI Crime Data Explorer (optional) |
+| `SUPABASE_URL` | API, Web | Supabase project URL |
+| `SUPABASE_ANON_KEY` | API, Web | Public anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | API only | Never expose to browser |
+| `DATABASE_URL` | API (Prisma) | Direct PostgreSQL connection |
+| `NEXT_PUBLIC_SUPABASE_URL` | Web | Same as SUPABASE_URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web | Same as anon key |
+| `ATTOM_API_KEY` | API | Optional — mock data used if absent |
 
 ---
 
 ## Development Workflow
 
 ```bash
-# Install all workspace dependencies from repo root
 npm install
-
-# Start all services in watch mode
 npm run dev            # web :3000, api :4000
-
-# Or run a specific service
-npm run dev --filter=web
-npm run dev --filter=api
-
-# Typecheck, lint, test
 npm run typecheck
 npm run lint
 npm run test
 
-# Database (Supabase — requires DATABASE_URL in .env)
-npm run db:migrate     # Apply migrations (prisma migrate deploy)
-npm run db:seed        # Seed sample properties
-npm run db:studio      # Open Prisma Studio GUI
+# After schema.prisma changes (Client, QuoteRequest, User.termsAcceptedAt added):
+npm run db:migrate:dev -- --name add-clients-quotes-terms
+npm run db:seed
+npm run db:studio      # Prisma Studio GUI
 ```
-
----
-
-## Supabase / Database
-
-- **All DB operations** in the API use Prisma (`apps/api/src/utils/prisma.ts`).
-- **Auth verification** uses the Supabase Admin client (`utils/supabaseAdmin.ts`) which bypasses RLS. Never expose the service role key to the browser.
-- **Frontend Supabase clients** are in `apps/web/src/lib/supabase/`:
-  - `client.ts` — browser client (anon key only)
-  - `server.ts` — server-side client (uses cookies)
-  - `middleware.ts` — refreshes sessions on every request
-
-When adding a new table or column:
-1. Edit `apps/api/prisma/schema.prisma`
-2. Run `npm run db:migrate:dev -- --name <migration-name>` to generate a migration
-3. Commit the generated `prisma/migrations/` file
-
----
-
-## API Conventions
-
-- All responses use `{ success: true, data: T }` or `{ success: false, error: { code, message } }`.
-- Authentication: `Authorization: Bearer <supabase-access-token>`.
-- Validation with Zod at the route level; errors are caught by `errorHandler.ts`.
-- Risk profiles and insurance estimates are **cached in the DB** with a TTL (see `RISK_CACHE_TTL_SECONDS` and `INSURANCE_ESTIMATE_CACHE_TTL_SECONDS` in `packages/shared/src/constants`).
-
----
-
-## Environment Variables
-
-All variables are documented in `.env.example`. Critical ones:
-
-| Variable | Where used | Notes |
-|---|---|---|
-| `SUPABASE_URL` | API, Web | Supabase project URL |
-| `SUPABASE_ANON_KEY` | API, Web | Public anon key |
-| `SUPABASE_SERVICE_ROLE_KEY` | API only | Never expose to browser |
-| `DATABASE_URL` | API (Prisma) | Direct PostgreSQL connection string |
-| `NEXT_PUBLIC_SUPABASE_URL` | Web | Same as SUPABASE_URL, prefixed for Next.js |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Web | Same as anon key, prefixed for Next.js |
-| `ATTOM_API_KEY` | API | Optional — mock data used if absent |
-
----
-
-## Code Style
-
-- **TypeScript strict mode** on in all packages.
-- **Prettier** is configured at the root (`.prettierrc`) — run `npm run format` before committing.
-- `const` over `let`; no `var`.
-- No `any` — use `unknown` and narrow types.
-- Prefer `async/await` over raw promises.
-- External API integrations live in `apps/api/src/integrations/`; business logic lives in `services/`.
-
----
-
-## Testing
-
-- Test files: `*.test.ts` or `*.spec.ts` alongside source files.
-- Jest is configured per package.
-- Run `npm run test` from root to run all tests.
-- All tests must pass before merging to `main`.
 
 ---
 
 ## Git Conventions
 
-### Branches
-
 | Branch | Purpose |
 |---|---|
 | `main` | Stable, production-ready |
-| `master` | Legacy default (treat as main) |
 | `claude/<desc>-<sessionId>` | AI-generated branches |
 | `feature/<desc>` | Human feature branches |
-| `fix/<desc>` | Bug fixes |
 
-- **Never push directly to `main` or `master`.**
-- AI assistants must work on their designated `claude/` branch.
-- Branch names for AI sessions: `claude/<short-description>-<sessionId>`.
-
-### Commits
-
-- Commits are **SSH-signed** — never pass `--no-gpg-sign`.
-- Imperative present-tense messages: `Add flood risk scoring`, `Fix insurance cache expiry`.
-- Do not amend published commits; create new ones.
-
-### Push
-
-```bash
-git push -u origin <branch-name>
-```
-
-On network failure retry up to 4 times with exponential backoff: 2 s, 4 s, 8 s, 16 s.
-
----
-
-## CI/CD
-
-| Workflow | Trigger | Steps |
-|---|---|---|
-| `ci.yml` | Push / PR | typecheck, lint, test, build, Docker build |
-| `deploy.yml` | Push to `main` | Prisma migrate + push Docker images to registry |
-| `db-migrate.yml` | Manual | Run migrations against staging or production |
-
-Required GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `CONTAINER_REGISTRY`, `REGISTRY_USERNAME`, `REGISTRY_PASSWORD`, `PRODUCTION_API_URL`.
+- **Never push to `main` or `master`**
+- Commits are **SSH-signed** — never pass `--no-gpg-sign`
+- AI assistants must work on their designated `claude/` branch
 
 ---
 
@@ -234,9 +261,11 @@ Required GitHub Actions secrets: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_
 
 1. **Read before editing.** Always read a file before modifying it.
 2. **Minimal changes.** Only change what is requested; avoid refactoring unrelated code.
-3. **No new files without reason.** Prefer editing existing files.
-4. **Stay in shared types.** When adding a new data shape, add it to `packages/shared/src/types/` so both apps can use it.
-5. **Supabase admin is server-only.** Never import `supabaseAdmin` from frontend code.
-6. **Check your branch.** Confirm you are on the correct `claude/` branch before committing or pushing.
-7. **No secrets.** Never commit `.env` files, API keys, or credentials.
-8. **Keep this file updated.** After adding new services, routes, or architectural patterns, update the relevant section above.
+3. **Stay in shared types.** New data shapes go in `packages/shared/src/types/`.
+4. **Supabase admin is server-only.** Never import `supabaseAdmin` from frontend code.
+5. **Check your branch.** Work on the designated `claude/` branch.
+6. **No secrets.** Never commit `.env` files or API keys.
+7. **DB migrations needed.** After any `schema.prisma` change, run `db:migrate:dev`.
+8. **Two portals.** Agent flows use `/agents/*`; consumer flows use `/(auth)/*`.
+9. **Onboarding required.** New users must accept terms at `/onboarding` before accessing the app.
+10. **Keep this file updated.** After adding routes, models, or patterns, update the relevant section.

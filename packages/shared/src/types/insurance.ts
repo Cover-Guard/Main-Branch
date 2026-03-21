@@ -38,3 +38,26 @@ export interface InsurabilityStatus {
   potentialIssues: string[]
   recommendedActions: string[]
 }
+
+export interface Carrier {
+  id: string
+  name: string
+  amBestRating: string        // e.g. 'A+', 'A', 'B+'
+  writingStatus: CarrierWritingStatus
+  coverageTypes: CoverageType[]
+  avgPremiumModifier: number  // multiplier vs market avg (1.0 = market rate)
+  statesLicensed: string[]
+  specialties: string[]
+  notes: string | null
+}
+
+export type CarrierWritingStatus = 'ACTIVELY_WRITING' | 'LIMITED' | 'NOT_WRITING' | 'SURPLUS_LINES'
+
+export interface CarriersResult {
+  propertyId: string
+  carriers: Carrier[]
+  marketCondition: MarketCondition
+  lastUpdated: string
+}
+
+export type MarketCondition = 'SOFT' | 'MODERATE' | 'HARD' | 'CRISIS'

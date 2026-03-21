@@ -26,13 +26,34 @@ export async function updateSession(request: NextRequest) {
   // Refresh session — do not add any code between createServerClient and getUser
   const { data: { user } } = await supabase.auth.getUser()
 
-  const protectedRoutes = ['/dashboard', '/saved', '/reports']
-  const isProtected = protectedRoutes.some((r) => request.nextUrl.pathname.startsWith(r))
+  const pathname = request.nextUrl.pathname
+
+  // Protected routes that require authentication
+  const protectedRoutes = ['/dashboard', '/analytics', '/account', '/compare', '/saved', '/reports']
+  const isProtected = protectedRoutes.some((r) => pathname.startsWith(r))
+
+  // Allow /onboarding without auth redirect (handles post-signup flow)
+  if (pathname === '/onboarding' || pathname.startsWith('/onboarding')) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      return NextResponse.redirect(url)
+    }
+    return supabaseResponse
+  }
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
-    url.searchParams.set('redirectTo', request.nextUrl.pathname)
+    url.searchParams.set('redirectTo', pathname)
+    return NextResponse.redirect(url)
+  }
+
+  // If authenticated user visits login/register, redirect to dashboard
+  const authRoutes = ['/login', '/register', '/agents/login', '/agents/register']
+  if (user && authRoutes.includes(pathname)) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 

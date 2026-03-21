@@ -32,3 +32,30 @@ export interface PropertyReport {
 }
 
 export type ReportType = 'FULL' | 'RISK_SUMMARY' | 'INSURANCE_ESTIMATE'
+
+export interface Client {
+  id: string
+  agentId: string
+  firstName: string
+  lastName: string
+  email: string
+  phone: string | null
+  notes: string | null
+  status: ClientStatus
+  createdAt: string
+  updatedAt: string
+  savedPropertyCount?: number
+}
+
+export type ClientStatus = 'ACTIVE' | 'PROSPECT' | 'CLOSED' | 'INACTIVE'
+
+export interface AnalyticsSummary {
+  totalSearches: number
+  totalSavedProperties: number
+  totalClients: number
+  totalReports: number
+  searchesByDay: Array<{ date: string; count: number }>
+  riskDistribution: Array<{ level: string; count: number }>
+  topStates: Array<{ state: string; count: number }>
+  recentActivity: Array<{ type: string; description: string; timestamp: string }>
+}

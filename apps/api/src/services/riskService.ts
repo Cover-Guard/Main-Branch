@@ -60,7 +60,7 @@ export async function getOrComputeRiskProfile(propertyId: string): Promise<Prope
 
   // Fetch risk data in parallel
   const [floodData, fireData, earthquakeData, windData, crimeData] = await Promise.all([
-    fetchFloodRisk(property.lat, property.lng),
+    fetchFloodRisk(property.lat, property.lng, property.zip),
     fetchFireRisk(property.lat, property.lng, property.state),
     fetchEarthquakeRisk(property.lat, property.lng),
     fetchWindRisk(property.lat, property.lng, property.state),

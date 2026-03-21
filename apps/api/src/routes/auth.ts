@@ -103,6 +103,21 @@ authRouter.get('/me/saved', requireAuth, async (req: Request, res, next) => {
   }
 })
 
+// ─── Accept terms ─────────────────────────────────────────────────────────────
+
+authRouter.post('/me/terms', requireAuth, async (req: Request, res, next) => {
+  try {
+    const { userId } = req as AuthenticatedRequest
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: { termsAcceptedAt: new Date() },
+    })
+    res.json({ success: true, data: { termsAcceptedAt: user.termsAcceptedAt } })
+  } catch (err) {
+    next(err)
+  }
+})
+
 // ─── Reports ──────────────────────────────────────────────────────────────────
 
 authRouter.get('/me/reports', requireAuth, async (req: Request, res, next) => {

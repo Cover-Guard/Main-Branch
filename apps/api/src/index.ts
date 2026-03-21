@@ -10,6 +10,8 @@ import { logger } from './utils/logger'
 import { errorHandler } from './middleware/errorHandler'
 import { propertiesRouter } from './routes/properties'
 import { authRouter } from './routes/auth'
+import { clientsRouter } from './routes/clients'
+import { analyticsRouter } from './routes/analytics'
 
 const app = express()
 const PORT = parseInt(process.env.PORT ?? '4000', 10)
@@ -56,6 +58,8 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/auth', authRouter)
 app.use('/api/properties', propertiesRouter)
+app.use('/api/clients', clientsRouter)
+app.use('/api/analytics', analyticsRouter)
 
 // ─── 404 ──────────────────────────────────────────────────────────────────────
 

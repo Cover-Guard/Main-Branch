@@ -8,7 +8,16 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    const { data: { user } } = await supabase.auth.exchangeCodeForSession(code)
+
+    if (user) {
+      // For OAuth sign-ins, check if this is a first-time user.
+      // If termsAcceptedAt is not in user metadata, redirect to onboarding.
+      const termsAccepted = user.user_metadata?.termsAcceptedAt
+      if (!termsAccepted && next !== '/onboarding') {
+        return NextResponse.redirect(`${origin}/onboarding`)
+      }
+    }
   }
 
   return NextResponse.redirect(`${origin}${next}`)

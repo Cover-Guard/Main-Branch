@@ -16,19 +16,21 @@ datasource db {
 // Auth is handled by Supabase Auth; this table extends the auth.users record.
 
 model User {
-  id            String   @id @default(uuid()) // matches auth.users.id
-  email         String   @unique
-  firstName     String
-  lastName      String
-  role          UserRole @default(BUYER)
-  company       String?
-  licenseNumber String?  // agents / lenders
-  avatarUrl     String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String    @id @default(uuid()) // matches auth.users.id
+  email             String    @unique
+  firstName         String
+  lastName          String
+  role              UserRole  @default(BUYER)
+  company           String?
+  licenseNumber     String?   // agents / lenders
+  avatarUrl         String?
+  termsAcceptedAt   DateTime? // null = has not yet accepted terms
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   savedProperties SavedProperty[]
   reports         PropertyReport[]
+  clients         Client[]
 
   @@map("users")
 }
@@ -221,6 +223,58 @@ enum ReportType {
   FULL
   RISK_SUMMARY
   INSURANCE_ESTIMATE
+}
+
+// ─── Clients (Agent → Client relationship) ────────────────────────────────────
+
+model Client {
+  id          String       @id @default(uuid())
+  agentId     String
+  firstName   String
+  lastName    String
+  email       String
+  phone       String?
+  notes       String?
+  status      ClientStatus @default(PROSPECT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  agent User @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+  @@map("clients")
+}
+
+enum ClientStatus {
+  ACTIVE
+  PROSPECT
+  CLOSED
+  INACTIVE
+}
+
+// ─── Quote Requests ───────────────────────────────────────────────────────────
+
+model QuoteRequest {
+  id            String             @id @default(uuid())
+  userId        String
+  propertyId    String
+  carrierId     String
+  coverageTypes String[]
+  notes         String?
+  status        QuoteRequestStatus @default(PENDING)
+  submittedAt   DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([userId])
+  @@index([propertyId])
+  @@map("quote_requests")
+}
+
+enum QuoteRequestStatus {
+  PENDING
+  SENT
+  RESPONDED
+  DECLINED
 }
 
 // ─── Search History ───────────────────────────────────────────────────────────

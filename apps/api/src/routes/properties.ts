@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { searchProperties, getPropertyById } from '../services/propertyService'
 import { getOrComputeRiskProfile } from '../services/riskService'
 import { getOrComputeInsuranceEstimate } from '../services/insuranceService'
+import { getCarriersForProperty } from '../services/carriersService'
+import { getInsurabilityStatus } from '../services/insurabilityService'
 import { requireAuth } from '../middleware/auth'
 import { prisma } from '../utils/prisma'
 import type { AuthenticatedRequest } from '../middleware/auth'
@@ -123,4 +125,63 @@ propertiesRouter.delete('/:id/save', requireAuth, async (req: Request, res, next
   } catch (err) {
     next(err)
   }
+})
+
+// ─── Insurability status ──────────────────────────────────────────────────────
+
+propertiesRouter.get('/:id/insurability', async (req, res, next) => {
+  try {
+    const status = await getInsurabilityStatus(req.params.id)
+    res.json({ success: true, data: status })
+  } catch (err) { next(err) }
+})
+
+// ─── Active carriers ──────────────────────────────────────────────────────────
+
+propertiesRouter.get('/:id/carriers', async (req, res, next) => {
+  try {
+    const carriers = await getCarriersForProperty(req.params.id)
+    res.json({ success: true, data: carriers })
+  } catch (err) { next(err) }
+})
+
+// ─── Quote requests ───────────────────────────────────────────────────────────
+
+const quoteRequestSchema = z.object({
+  carrierId:     z.string().min(1),
+  coverageTypes: z.array(z.string()).min(1).max(6),
+  notes:         z.string().max(1000).optional(),
+})
+
+propertiesRouter.post('/:id/quote-request', requireAuth, async (req: Request, res, next) => {
+  try {
+    const { userId } = req as AuthenticatedRequest
+    const body = quoteRequestSchema.parse(req.body)
+
+    const quoteRequest = await prisma.quoteRequest.create({
+      data: {
+        userId,
+        propertyId:    req.params.id,
+        carrierId:     body.carrierId,
+        coverageTypes: body.coverageTypes,
+        notes:         body.notes ?? null,
+      },
+    })
+
+    res.status(201).json({
+      success: true,
+      data: { quoteRequestId: quoteRequest.id },
+    })
+  } catch (err) { next(err) }
+})
+
+propertiesRouter.get('/:id/quote-requests', requireAuth, async (req: Request, res, next) => {
+  try {
+    const { userId } = req as AuthenticatedRequest
+    const requests = await prisma.quoteRequest.findMany({
+      where: { propertyId: req.params.id, userId },
+      orderBy: { submittedAt: 'desc' },
+    })
+    res.json({ success: true, data: requests })
+  } catch (err) { next(err) }
 })
