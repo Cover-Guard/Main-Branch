@@ -41,6 +41,11 @@ export async function requireAuth(
 export function requireRole(...roles: string[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const authReq = req as AuthenticatedRequest
+    if (!authReq.userId) {
+      // requireAuth was not applied before requireRole — treat as unauthorized
+      res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } })
+      return
+    }
     if (!roles.includes(authReq.userRole)) {
       res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Insufficient permissions' } })
       return

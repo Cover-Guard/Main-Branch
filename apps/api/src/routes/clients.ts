@@ -1,12 +1,13 @@
 import { Router } from 'express'
 import { z } from 'zod'
 import { prisma } from '../utils/prisma'
-import { requireAuth } from '../middleware/auth'
+import { requireAuth, requireRole } from '../middleware/auth'
 import type { Request } from 'express'
 import type { AuthenticatedRequest } from '../middleware/auth'
 
 export const clientsRouter = Router()
 clientsRouter.use(requireAuth)
+clientsRouter.use(requireRole('AGENT', 'ADMIN'))
 
 const clientSchema = z.object({
   firstName: z.string().min(1).max(50),

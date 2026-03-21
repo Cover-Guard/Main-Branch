@@ -9,6 +9,7 @@ import type { Property, PropertySearchParams, PropertySearchResult } from '@cove
 import { logger } from '../utils/logger'
 
 const ATTOM_BASE_URL = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0'
+const ATTOM_TIMEOUT_MS = 10000
 
 interface AttomPropertyDetail {
   identifier: { attomId: string; apn: string }
@@ -46,6 +47,7 @@ async function fetchAttom<T>(path: string, params: Record<string, string>): Prom
 
   const res = await fetch(url.toString(), {
     headers: { apikey: apiKey, accept: 'application/json' },
+    signal: AbortSignal.timeout(ATTOM_TIMEOUT_MS),
   })
 
   if (!res.ok) {
@@ -54,6 +56,18 @@ async function fetchAttom<T>(path: string, params: Record<string, string>): Prom
   }
 
   return res.json() as Promise<T>
+}
+
+/** Map ATTOM proptype string to our PropertyType enum value. */
+function mapAttomPropertyType(proptype: string): Property['propertyType'] {
+  const t = proptype?.toUpperCase() ?? ''
+  if (t.includes('CONDO')) return 'CONDO'
+  if (t.includes('TOWNHOUSE') || t.includes('TOWN HOUSE')) return 'TOWNHOUSE'
+  if (t.includes('MULTI') || t.includes('DUPLEX') || t.includes('TRIPLEX') || t.includes('QUADRUPLEX')) return 'MULTI_FAMILY'
+  if (t.includes('MOBILE') || t.includes('MANUFACTURED')) return 'MOBILE_HOME'
+  if (t.includes('COMMERCIAL') || t.includes('RETAIL') || t.includes('OFFICE')) return 'COMMERCIAL'
+  if (t.includes('LAND') || t.includes('LOT') || t.includes('VACANT')) return 'LAND'
+  return 'SINGLE_FAMILY'
 }
 
 function mapAttomToProperty(attom: AttomPropertyDetail): Omit<Property, 'id' | 'createdAt' | 'updatedAt'> {
@@ -65,7 +79,7 @@ function mapAttomToProperty(attom: AttomPropertyDetail): Omit<Property, 'id' | '
     county: attom.location.county,
     lat: parseFloat(attom.location.latitude),
     lng: parseFloat(attom.location.longitude),
-    propertyType: 'SINGLE_FAMILY',
+    propertyType: mapAttomPropertyType(attom.summary.proptype),
     yearBuilt: attom.summary.yearbuilt ?? null,
     squareFeet: attom.building?.size?.universalsize ?? null,
     bedrooms: attom.building?.rooms?.beds ?? null,

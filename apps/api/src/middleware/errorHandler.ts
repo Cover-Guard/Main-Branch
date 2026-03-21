@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { logger } from '../utils/logger'
 import { ZodError } from 'zod'
+import { Prisma } from '@prisma/client'
 
 export function errorHandler(
   err: unknown,
@@ -16,6 +17,18 @@ export function errorHandler(
         message: 'Request validation failed',
         details: err.flatten(),
       },
+    })
+    return
+  }
+
+  // Prisma "record not found" (findUniqueOrThrow / findFirstOrThrow / P2025)
+  if (
+    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err.code === 'P2025'
+  ) {
+    res.status(404).json({
+      success: false,
+      error: { code: 'NOT_FOUND', message: 'Resource not found' },
     })
     return
   }

@@ -212,7 +212,22 @@ export async function fetchWindRisk(lat: number, lng: number, state: string): Pr
   let hurricaneRisk = hurricaneStates.includes(state)
   const tornadoRisk  = tornadoStates.includes(state)
   const hailRisk     = hailStates.includes(state)
-  const designWindSpeed = lat < 25 ? 180 : lat < 30 ? 150 : lat < 35 ? 130 : 115
+
+  // ASCE 7-22 basic wind speed approximation (mph) by geographic region.
+  // Coastal Gulf/Atlantic areas use higher values; inland uses ASCE 7 Fig 26.5-1 contours.
+  // This is a best-effort regional estimate; the ASCE 7 Hazard Tool API requires registration.
+  let designWindSpeed: number
+  const coastalHighWindStates = ['FL', 'LA', 'TX', 'MS', 'AL']
+  const coastalMidWindStates  = ['GA', 'SC', 'NC', 'VA', 'MD', 'DE', 'NJ', 'NY', 'CT', 'RI', 'MA', 'ME']
+  if (coastalHighWindStates.includes(state)) {
+    designWindSpeed = lat < 26 ? 180 : lat < 29 ? 165 : 150
+  } else if (coastalMidWindStates.includes(state)) {
+    designWindSpeed = 130
+  } else if (tornadoStates.includes(state)) {
+    designWindSpeed = 115 // tornado alley — high gust events but lower sustained ASCE basic wind
+  } else {
+    designWindSpeed = 115 // national baseline for Risk Category II
+  }
 
   // NOAA SLOSH Hurricane Surge Zones (coastal only)
   if (hurricaneRisk) {

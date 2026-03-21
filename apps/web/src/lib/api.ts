@@ -14,7 +14,10 @@ import type {
 import type { CoverageType } from '@coverguard/shared'
 import { createClient } from './supabase/client'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+// Use relative paths so all requests go through the Next.js rewrite proxy
+// (next.config.ts: /api/* → Express). Never call the Express server directly
+// from the browser — this would break CORS and expose the internal API URL.
+const API_BASE = ''
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const supabase = createClient()
@@ -25,7 +28,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
@@ -122,7 +125,7 @@ export async function getClients(): Promise<Client[]> {
   return apiFetch('/api/clients')
 }
 
-export async function createClient2(data: {
+export async function addClient(data: {
   firstName: string
   lastName: string
   email: string

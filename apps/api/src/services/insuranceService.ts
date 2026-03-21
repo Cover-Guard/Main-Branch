@@ -47,14 +47,15 @@ function computeHomeownersPremium(inputs: InsuranceInputs): { low: number; high:
 function computeFloodPremium(inSFHA: boolean, floodScore: number, estimatedValue: number): { low: number; high: number; avg: number } | null {
   if (!inSFHA && floodScore < 30) return null // Not required, low risk
 
-  const contentValue = estimatedValue * 0.3
-  const buildingCoverage = Math.min(estimatedValue * 0.8, 250000) // NFIP max $250k building
-  const contentCoverageMax = Math.min(contentValue, 100000) // NFIP max $100k contents
+  // NFIP max coverage: $250k building, $100k contents
+  const buildingCoverage = Math.min(estimatedValue * 0.8, 250000)
+  const contentCoverage = Math.min(estimatedValue * 0.3, 100000)
+  const coverageRatio = ((buildingCoverage / 250000) + (contentCoverage / 100000)) / 2
 
-  // NFIP average rate (simplified): ~$1,000/yr for building + contents in SFHA
+  // NFIP simplified base: ~$1,000/yr in SFHA, ~$600/yr outside
   const base = inSFHA ? 1400 : 600
   const scoreMult = 1 + (floodScore / 100) * 1.5
-  const avg = Math.round(base * scoreMult * (buildingCoverage / 250000) * (contentCoverageMax / 100000))
+  const avg = Math.round(base * scoreMult * coverageRatio)
 
   return { low: Math.round(avg * 0.6), high: Math.round(avg * 1.8), avg }
 }
@@ -68,21 +69,39 @@ function computeWindPremium(hurricaneRisk: boolean, windScore: number, estimated
   return { low: Math.round(avg * 0.7), high: Math.round(avg * 1.4), avg }
 }
 
+function buildKeyRiskFactors(inputs: InsuranceInputs): string[] {
+  const factors: string[] = []
+  if (inputs.inSFHA) factors.push('Property is in a FEMA Special Flood Hazard Area (SFHA)')
+  if (inputs.floodRiskScore > 50) factors.push(`Elevated flood risk score (${inputs.floodRiskScore}/100)`)
+  if (inputs.fireRiskScore > 70) factors.push(`High fire risk score (${inputs.fireRiskScore}/100) — premium surcharge applied`)
+  if (inputs.fireRiskScore > 50 && inputs.fireRiskScore <= 70) factors.push(`Moderate fire risk score (${inputs.fireRiskScore}/100)`)
+  if (inputs.hurricaneRisk) factors.push('Hurricane exposure — separate wind/storm policy likely required')
+  if (inputs.windRiskScore > 70) factors.push(`High wind risk score (${inputs.windRiskScore}/100)`)
+  if (inputs.earthquakeRiskScore > 70) factors.push(`High seismic risk (${inputs.earthquakeRiskScore}/100) — earthquake coverage not included in standard HO policy`)
+  if (inputs.yearBuilt < 1970) factors.push(`Older construction (built ${inputs.yearBuilt}) — age surcharge applied`)
+  else if (inputs.yearBuilt < 1990) factors.push(`Pre-1990 construction (built ${inputs.yearBuilt}) — minor age surcharge applied`)
+  return factors
+}
+
 export async function getOrComputeInsuranceEstimate(
   propertyId: string
 ): Promise<InsuranceCostEstimate> {
-  const property = await prisma.property.findUniqueOrThrow({
-    where: { id: propertyId },
-    include: { riskProfile: true },
-  })
+  // Load property and its most current risk profile separately to avoid stale include data
+  const [property, risk] = await Promise.all([
+    prisma.property.findUniqueOrThrow({ where: { id: propertyId } }),
+    prisma.riskProfile.findUnique({ where: { propertyId } }),
+  ])
 
-  // Return cached if valid
+  // Return cached estimate if still valid AND risk profile hasn't been updated since estimate
   const cached = await prisma.insuranceEstimate.findUnique({ where: { propertyId } })
-  if (cached && cached.expiresAt > new Date()) {
+  if (
+    cached &&
+    cached.expiresAt > new Date() &&
+    (!risk || risk.generatedAt <= cached.generatedAt)
+  ) {
     return prismaEstimateToDto(cached, propertyId)
   }
 
-  const risk = property.riskProfile
   const inputs: InsuranceInputs = {
     propertyId,
     estimatedValue: property.estimatedValue ?? 400000,
@@ -102,6 +121,7 @@ export async function getOrComputeInsuranceEstimate(
   const wind = computeWindPremium(inputs.hurricaneRisk, inputs.windRiskScore, inputs.estimatedValue)
 
   const annualTotal = homeowners.avg + (flood?.avg ?? 0) + (wind?.avg ?? 0)
+  const keyRiskFactors = buildKeyRiskFactors(inputs)
 
   const expiresAt = new Date(Date.now() + INSURANCE_ESTIMATE_CACHE_TTL_SECONDS * 1000)
 
@@ -144,12 +164,13 @@ export async function getOrComputeInsuranceEstimate(
     },
   })
 
-  return prismaEstimateToDto(estimate, propertyId)
+  return prismaEstimateToDto(estimate, propertyId, keyRiskFactors)
 }
 
 function prismaEstimateToDto(
   e: Awaited<ReturnType<typeof prisma.insuranceEstimate.findUniqueOrThrow>>,
-  propertyId: string
+  propertyId: string,
+  keyRiskFactors: string[] = [],
 ): InsuranceCostEstimate {
   return {
     propertyId,
@@ -182,7 +203,7 @@ function prismaEstimateToDto(
         notes: ['May be excluded from standard homeowners policy in high-risk areas'],
       }] : []),
     ],
-    keyRiskFactors: [],
+    keyRiskFactors,
     recommendations: [
       'Get quotes from at least 3 insurers',
       'Ask about bundling discounts',
