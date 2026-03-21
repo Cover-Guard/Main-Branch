@@ -1,20 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "version": 2,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "framework": null,
-  "ignoreCommand": "npx turbo-ignore",
-  "projects": [
-    {
-      "name": "coverguard-web",
-      "src": "apps/web",
-      "rewrites": [
-        {
-          "source": "/api/:path*",
-          "destination": "https://api.coverguard.io/api/:path*"
-        }
-      ]
-    }
-  ]
+  "framework": "nextjs"
 }
