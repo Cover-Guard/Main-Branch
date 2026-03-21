@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express'
 import { logger } from '../utils/logger'
 import { ZodError } from 'zod'
-import { Prisma } from '@prisma/client'
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library'
 
 export function errorHandler(
   err: unknown,
@@ -23,7 +23,7 @@ export function errorHandler(
 
   // Prisma "record not found" (findUniqueOrThrow / findFirstOrThrow / P2025)
   if (
-    err instanceof Prisma.PrismaClientKnownRequestError &&
+    err instanceof PrismaClientKnownRequestError &&
     err.code === 'P2025'
   ) {
     res.status(404).json({

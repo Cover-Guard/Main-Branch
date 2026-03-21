@@ -74,9 +74,9 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
       stateCounts.set(s, (stateCounts.get(s) ?? 0) + 1)
     })
     // Case-insensitive 2-letter state code extraction from search queries
-    searches.slice(0, 200).forEach((s) => {
+    searches.slice(0, 200).forEach((s: { query: string; searchedAt: Date }) => {
       const stateMatch = s.query.match(/,\s*([A-Za-z]{2})\s*(?:\d{5})?$/)?.[1]?.toUpperCase()
-        ?? s.query.match(/\b([A-Za-z]{2})\b/g)?.find((token) =>
+        ?? s.query.match(/\b([A-Za-z]{2})\b/g)?.find((token: string) =>
           /^[A-Z]{2}$/.test(token.toUpperCase())
         )?.toUpperCase()
       if (stateMatch && stateMatch.length === 2) {
@@ -90,12 +90,12 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
 
     // Recent activity
     const recentActivity = [
-      ...searches.slice(0, 5).map((s) => ({
+      ...searches.slice(0, 5).map((s: { query: string; searchedAt: Date }) => ({
         type: 'search',
         description: `Searched "${s.query}"`,
         timestamp: s.searchedAt.toISOString(),
       })),
-      ...savedProperties.slice(0, 5).map(({ property, savedAt }) => ({
+      ...savedProperties.slice(0, 5).map(({ property, savedAt }: { property: { address: string; city: string }; savedAt: Date }) => ({
         type: 'save',
         description: `Saved ${property.address}, ${property.city}`,
         timestamp: savedAt.toISOString(),
