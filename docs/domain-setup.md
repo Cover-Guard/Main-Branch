@@ -1,7 +1,16 @@
-# Domain Setup — coverguard.io (IONOS)
+# ~~Domain Setup — coverguard.io (IONOS / Vercel)~~
 
-This document covers the exact DNS records to add in IONOS and the Vercel
-project configuration needed to serve CoverGuard on `coverguard.io`.
+> **⚠️ DEPRECATED — Vercel is no longer used for CoverGuard deployments.**
+>
+> This document describes the previous Vercel-based setup. It is kept for
+> historical reference only.
+>
+> For current DNS and deployment instructions, see:
+> - [DNS_CDN_SETUP.md](./DNS_CDN_SETUP.md) — DNS, CDN, and SSL/TLS setup
+> - [PRODUCTION_DEPLOYMENT.md](./PRODUCTION_DEPLOYMENT.md) — Docker deployment
+> - [DOCKER_REGISTRY_SETUP.md](./DOCKER_REGISTRY_SETUP.md) — Container registry
+>
+> **Migration completed:** CoverGuard now runs as Docker containers behind nginx.
 
 ---
 

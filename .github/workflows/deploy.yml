@@ -8,6 +8,10 @@ concurrency:
   group: deploy-production
   cancel-in-progress: false
 
+env:
+  REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
   # ── Database migrations (run first, before deploying code) ───────────────────
   migrate:
@@ -27,59 +31,111 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-  # ── Deploy API to Vercel ─────────────────────────────────────────────────────
-  deploy-api:
-    name: Deploy API → api.coverguard.io
+  # ── Build & push API Docker image ─────────────────────────────────────────────
+  build-api:
+    name: Build & Push API Image
     runs-on: ubuntu-latest
-    environment: production
+    needs: migrate
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install -g vercel
-      - name: Deploy API
-        working-directory: apps/api
-        run: |
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_API_PROJECT_ID }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Build and push API
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/api/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/coverguard-api:latest
+            ${{ env.REGISTRY }}/coverguard-api:${{ env.IMAGE_TAG }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-  # ── Deploy Web to Vercel ─────────────────────────────────────────────────────
-  deploy-web:
-    name: Deploy Web → coverguard.io
+  # ── Build & push Web Docker image ─────────────────────────────────────────────
+  build-web:
+    name: Build & Push Web Image
     runs-on: ubuntu-latest
-    needs: deploy-api
-    environment: production
+    needs: migrate
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-          node-version: '20'
-          cache: 'npm'
-      - run: npm install -g vercel
-      - name: Build shared package first
-        run: npm ci && npm run build --workspace=@coverguard/shared
-      - name: Deploy Web
-        working-directory: apps/web
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Build and push Web
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/coverguard-web:latest
+            ${{ env.REGISTRY }}/coverguard-web:${{ env.IMAGE_TAG }}
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_API_URL=${{ secrets.PRODUCTION_API_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── Deploy to production server ───────────────────────────────────────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-api, build-web]
+    environment: production
+    permissions:
+      contents: read
+    steps:
+      - name: Add server to known hosts
         run: |
-          vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-          vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_WEB_PROJECT_ID }}
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          timeout: 120s
+          script: |
+            set -euo pipefail
+            cd /opt/coverguard
+            export DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
+            export IMAGE_TAG=${{ github.sha }}
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --no-deps api
+            # Wait for API health check before rolling the web container
+            MAX_ATTEMPTS=24
+            for i in $(seq 1 $MAX_ATTEMPTS); do
+              if wget -qO- http://localhost:4000/health | grep -q '"status":"ok"'; then
+                echo "API is healthy"
+                break
+              fi
+              echo "Waiting for API... ($i/$MAX_ATTEMPTS)"
+              sleep 5
+            done
+            docker compose -f docker-compose.prod.yml up -d --no-deps web
+            docker image prune -f
 
   # ── Deployment summary ───────────────────────────────────────────────────────
   summary:
     name: Summary
     runs-on: ubuntu-latest
-    needs: [deploy-web, deploy-api]
+    needs: [build-api, build-web, deploy]
     if: always()
     steps:
       - name: Write summary
@@ -87,6 +143,8 @@ jobs:
           echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
           echo "| Service | URL | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|---|---|---|" >> $GITHUB_STEP_SUMMARY
-          echo "| Web | https://coverguard.io | ${{ needs.deploy-web.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| API | https://api.coverguard.io | ${{ needs.deploy-api.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Commit | ${{ github.sha }} | — |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | https://coverguard.io | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API | https://api.coverguard.io | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| API image | \`${{ env.REGISTRY }}/coverguard-api:${{ env.IMAGE_TAG }}\` | ${{ needs.build-api.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Web image | \`${{ env.REGISTRY }}/coverguard-web:${{ env.IMAGE_TAG }}\` | ${{ needs.build-web.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` | — |" >> $GITHUB_STEP_SUMMARY
