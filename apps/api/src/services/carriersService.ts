@@ -13,7 +13,6 @@
 
 import type { CarriersResult, Carrier, MarketCondition } from '@coverguard/shared'
 import { prisma } from '../utils/prisma'
-import { logger } from '../utils/logger'
 
 // ─── Known carriers by state market presence ───────────────────────────────────
 
