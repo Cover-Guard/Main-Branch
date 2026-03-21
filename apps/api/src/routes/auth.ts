@@ -36,18 +36,27 @@ authRouter.post('/register', async (req, res, next) => {
       return
     }
 
-    // Create user profile in our DB
-    const user = await prisma.user.create({
-      data: {
-        id: authData.user.id,
-        email: body.email,
-        firstName: body.firstName,
-        lastName: body.lastName,
-        role: body.role,
-        company: body.company ?? null,
-        licenseNumber: body.licenseNumber ?? null,
-      },
-    })
+    // Create user profile in our DB — if this fails, clean up the Supabase user
+    // to avoid an orphaned auth record with no corresponding profile.
+    let user
+    try {
+      user = await prisma.user.create({
+        data: {
+          id: authData.user.id,
+          email: body.email,
+          firstName: body.firstName,
+          lastName: body.lastName,
+          role: body.role,
+          company: body.company ?? null,
+          licenseNumber: body.licenseNumber ?? null,
+        },
+      })
+    } catch (dbErr) {
+      await supabaseAdmin.auth.admin.deleteUser(authData.user.id).catch(() => {
+        // Best-effort cleanup — log but don't throw over the original error
+      })
+      throw dbErr
+    }
 
     res.status(201).json({ success: true, data: { id: user.id, email: user.email, role: user.role } })
   } catch (err) {

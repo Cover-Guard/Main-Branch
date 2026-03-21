@@ -11,7 +11,8 @@ const nextConfig: NextConfig = {
   async rewrites() {
     // Proxy /api/* to the Express API so the frontend never makes
     // cross-origin requests in production (avoids CORS, hides API URL).
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
+    // API_URL is server-only (no NEXT_PUBLIC_ prefix) — it is never sent to the browser.
+    const apiUrl = process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000'
     return [
       {
         source: '/api/:path*',

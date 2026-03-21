@@ -21,9 +21,17 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
         where: { userId },
         include: { property: { include: { riskProfile: true } } },
         orderBy: { savedAt: 'desc' },
+        take: 200,
       }),
-      prisma.client.findMany({ where: { agentId: userId } }),
-      prisma.propertyReport.findMany({ where: { userId } }),
+      prisma.client.findMany({
+        where: { agentId: userId },
+        take: 1000,
+      }),
+      prisma.propertyReport.findMany({
+        where: { userId },
+        orderBy: { generatedAt: 'desc' },
+        take: 100,
+      }),
       prisma.searchHistory.findMany({
         where: { userId },
         orderBy: { searchedAt: 'desc' },
@@ -59,15 +67,21 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
       .filter((l) => riskCounts.has(l))
       .map((level) => ({ level, count: riskCounts.get(level)! }))
 
-    // Top states
+    // Top states — extract from saved properties and search queries
     const stateCounts = new Map<string, number>()
     savedProperties.forEach(({ property }) => {
       const s = property.state
       stateCounts.set(s, (stateCounts.get(s) ?? 0) + 1)
     })
+    // Case-insensitive 2-letter state code extraction from search queries
     searches.slice(0, 200).forEach((s) => {
-      const stateMatch = s.query.match(/,\s*([A-Z]{2})\s*/)?.[1]
-      if (stateMatch) stateCounts.set(stateMatch, (stateCounts.get(stateMatch) ?? 0) + 1)
+      const stateMatch = s.query.match(/,\s*([A-Za-z]{2})\s*(?:\d{5})?$/)?.[1]?.toUpperCase()
+        ?? s.query.match(/\b([A-Za-z]{2})\b/g)?.find((token) =>
+          /^[A-Z]{2}$/.test(token.toUpperCase())
+        )?.toUpperCase()
+      if (stateMatch && stateMatch.length === 2) {
+        stateCounts.set(stateMatch, (stateCounts.get(stateMatch) ?? 0) + 1)
+      }
     })
     const topStates = Array.from(stateCounts.entries())
       .sort(([, a], [, b]) => b - a)

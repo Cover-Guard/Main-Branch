@@ -31,7 +31,9 @@ propertiesRouter.get('/search', async (req, res, next) => {
       res.status(400).json({ success: false, error: { code: 'MISSING_PARAM', message: 'Provide address, zip, city, or parcelId' } })
       return
     }
-    const result = await searchProperties(params)
+    // Pass userId if authenticated (optional — search is public)
+    const userId = (req as AuthenticatedRequest).userId ?? undefined
+    const result = await searchProperties(params, userId)
     res.json({ success: true, data: result })
   } catch (err) {
     next(err)

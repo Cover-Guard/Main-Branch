@@ -24,22 +24,26 @@ export default function OnboardingPage() {
       })
       if (metaError) throw metaError
 
-      // Update profile in API
+      // Update profile in API — check response before continuing
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.access_token) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/me/terms`, {
+        const res = await fetch('/api/auth/me/terms', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
         })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          throw new Error((json as { error?: { message?: string } }).error?.message ?? 'Failed to save terms acceptance')
+        }
       }
 
       router.push('/dashboard')
       router.refresh()
-    } catch {
-      setError('Something went wrong. Please try again.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       setLoading(false)
     }
   }
@@ -74,7 +78,7 @@ export default function OnboardingPage() {
             <DisclosureItem
               icon={<FileText className="h-5 w-5 text-blue-600" />}
               bg="bg-blue-50"
-              title="Data Accuracy &amp; Limitations"
+              title="Data Accuracy & Limitations"
               body="Risk scores are derived from publicly available datasets (FEMA, USGS, Cal Fire, FBI UCR) and third-party data providers. Data may be incomplete, outdated, or inaccurate for some locations. CoverGuard does not guarantee the accuracy of any risk assessment."
             />
             <DisclosureItem
@@ -121,7 +125,7 @@ export default function OnboardingPage() {
               disabled={!accepted || loading}
               className="btn-primary w-full py-3 text-base"
             >
-              {loading ? 'Saving…' : 'Accept &amp; Continue to CoverGuard'}
+              {loading ? 'Saving…' : 'Accept & Continue to CoverGuard'}
             </button>
           </div>
         </div>
@@ -145,7 +149,7 @@ function DisclosureItem({
     <div className={`flex gap-4 rounded-lg p-4 ${bg}`}>
       <div className="mt-0.5 shrink-0">{icon}</div>
       <div>
-        <p className="font-semibold text-gray-900" dangerouslySetInnerHTML={{ __html: title }} />
+        <p className="font-semibold text-gray-900">{title}</p>
         <p className="mt-1 text-sm text-gray-600">{body}</p>
       </div>
     </div>
