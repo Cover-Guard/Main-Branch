@@ -42,14 +42,14 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
     // Searches by day (last 30 days)
     const now = Date.now()
     const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000
-    const recentSearches = searches.filter((s) => s.searchedAt.getTime() > thirtyDaysAgo)
+    const recentSearches = searches.filter((s: { searchedAt: Date; query: string }) => s.searchedAt.getTime() > thirtyDaysAgo)
 
     const byDay = new Map<string, number>()
     for (let i = 29; i >= 0; i--) {
       const d = new Date(now - i * 24 * 60 * 60 * 1000)
       byDay.set(d.toISOString().slice(0, 10), 0)
     }
-    recentSearches.forEach((s) => {
+    recentSearches.forEach((s: { searchedAt: Date; query: string }) => {
       const day = s.searchedAt.toISOString().slice(0, 10)
       byDay.set(day, (byDay.get(day) ?? 0) + 1)
     })
@@ -58,7 +58,7 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
 
     // Risk distribution
     const riskCounts = new Map<string, number>()
-    savedProperties.forEach(({ property }) => {
+    savedProperties.forEach(({ property }: { property: { state: string; riskProfile?: { overallRiskLevel: string } | null } }) => {
       const level = property.riskProfile?.overallRiskLevel ?? 'UNKNOWN'
       riskCounts.set(level, (riskCounts.get(level) ?? 0) + 1)
     })
@@ -69,7 +69,7 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
 
     // Top states — extract from saved properties and search queries
     const stateCounts = new Map<string, number>()
-    savedProperties.forEach(({ property }) => {
+    savedProperties.forEach(({ property }: { property: { state: string; riskProfile?: { overallRiskLevel: string } | null } }) => {
       const s = property.state
       stateCounts.set(s, (stateCounts.get(s) ?? 0) + 1)
     })
@@ -100,7 +100,7 @@ analyticsRouter.get('/', async (req: Request, res, next) => {
         description: `Saved ${property.address}, ${property.city}`,
         timestamp: savedAt.toISOString(),
       })),
-      ...reports.slice(0, 3).map((r) => ({
+      ...reports.slice(0, 3).map((r: { reportType: string; generatedAt: Date }) => ({
         type: 'report',
         description: `Generated ${r.reportType.replace('_', ' ').toLowerCase()} report`,
         timestamp: r.generatedAt.toISOString(),

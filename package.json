@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "turbo run test --",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "db:migrate": "turbo run db:migrate --filter=api",
@@ -18,11 +18,13 @@
     "clean": "turbo run clean"
   },
   "devDependencies": {
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.1",
+    "@eslint/js": "^9.17.0",
+    "eslint": "^9.17.0",
     "prettier": "^3.4.2",
+    "prettier-plugin-tailwindcss": "^0.6.10",
     "turbo": "^2.3.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2"
   },
   "engines": {
     "node": ">=20.0.0",

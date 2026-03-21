@@ -17,7 +17,7 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"]
+      "@coverguard/*": ["./packages/*/src"]
     },
     "forceConsistentCasingInFileNames": true,
     "allowJs": true

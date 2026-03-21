@@ -1,7 +1,7 @@
 import { prisma } from '../utils/prisma'
 import type { InsuranceCostEstimate } from '@coverguard/shared'
 import { INSURANCE_ESTIMATE_CACHE_TTL_SECONDS } from '@coverguard/shared'
-import { ConfidenceLevel } from '@prisma/client'
+
 
 interface InsuranceInputs {
   propertyId: string
@@ -130,7 +130,7 @@ export async function getOrComputeInsuranceEstimate(
     update: {
       estimatedAnnualTotal: annualTotal,
       estimatedMonthlyTotal: Math.round(annualTotal / 12),
-      confidenceLevel: ConfidenceLevel.MEDIUM,
+      confidenceLevel: 'MEDIUM',
       homeownersLow: homeowners.low,
       homeownersHigh: homeowners.high,
       homeownersAvg: homeowners.avg,
@@ -148,7 +148,7 @@ export async function getOrComputeInsuranceEstimate(
       propertyId,
       estimatedAnnualTotal: annualTotal,
       estimatedMonthlyTotal: Math.round(annualTotal / 12),
-      confidenceLevel: ConfidenceLevel.MEDIUM,
+      confidenceLevel: 'MEDIUM',
       homeownersLow: homeowners.low,
       homeownersHigh: homeowners.high,
       homeownersAvg: homeowners.avg,

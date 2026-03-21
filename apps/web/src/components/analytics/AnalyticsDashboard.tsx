@@ -44,12 +44,12 @@ function DonutChart({
   const r = size * 0.25
   const cx = size / 2
   const cy = size / 2
-  let cumulative = 0
 
-  function arc(value: number) {
-    const angle = (value / total) * 2 * Math.PI
+  let cumulative = 0
+  const segmentPaths = segments.map((seg) => {
+    const angle = (seg.value / total) * 2 * Math.PI
     const startAngle = cumulative * 2 * Math.PI - Math.PI / 2
-    cumulative += value / total
+    cumulative += seg.value / total
     const endAngle = cumulative * 2 * Math.PI - Math.PI / 2
     const x1 = cx + R * Math.cos(startAngle)
     const y1 = cy + R * Math.sin(startAngle)
@@ -61,12 +61,12 @@ function DonutChart({
     const iy2 = cy + r * Math.sin(endAngle)
     const large = angle > Math.PI ? 1 : 0
     return `M ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${r} ${r} 0 ${large} 0 ${ix1} ${iy1} Z`
-  }
+  })
 
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      {segments.map((seg, i) => (
-        <path key={i} d={arc(seg.value)} fill={seg.color} />
+      {segmentPaths.map((d, i) => (
+        <path key={i} d={d} fill={segments[i].color} />
       ))}
     </svg>
   )
